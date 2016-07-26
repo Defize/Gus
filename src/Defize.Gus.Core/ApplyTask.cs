@@ -15,7 +15,8 @@
             var databaseHelper = new DatabaseHelper(context);
             var fileSystemHelper = new FileSystemHelper(context);
 
-            var connection = databaseHelper.CreateAndOpenConnection(configuration.Server);
+            var connection = databaseHelper.CreateAndOpenConnection(configuration.Server, configuration.Database, configuration.UserName, configuration.Password, configuration.CreateDatabaseIfMissing);
+
             if (connection == null)
             {
                 return false;
@@ -31,7 +32,7 @@
             }
 
             context.RaiseExecutionEvent("Determining scripts to apply.");
-            var scriptsToApply = GetScriptsToApply(configuration.SourcePath, database, databaseHelper, fileSystemHelper);
+            var scriptsToApply = GetScriptsToApply(configuration.SourcePath, server, databaseHelper, fileSystemHelper);
             if (scriptsToApply == null)
             {
                 return false;
@@ -40,12 +41,12 @@
             context.ExecutionStepCount = (uint)scriptsToApply.Count;
             context.RaiseExecutionEvent(string.Format("Found {0} scripts to apply.", scriptsToApply.Count));
 
-            var success = ApplyScripts(scriptsToApply, server, database, databaseHelper, fileSystemHelper, configuration.RecordOnly, context, configuration.HaltOnError);
+            var success = ApplyScripts(scriptsToApply, server, databaseHelper, fileSystemHelper, configuration.RecordOnly, context, configuration.HaltOnError);
 
             return success;
         }
 
-        private static ICollection<FileInfo> GetScriptsToApply(string sourcePath, Database database, DatabaseHelper databaseHelper, FileSystemHelper fileSystemHelper)
+        private static ICollection<FileInfo> GetScriptsToApply(string sourcePath, Server server, DatabaseHelper databaseHelper, FileSystemHelper fileSystemHelper)
         {
             var scriptFiles = fileSystemHelper.GetScriptFiles(sourcePath);
             if (scriptFiles == null)
@@ -53,13 +54,13 @@
                 return null;
             }
 
-            var previouslyAppliedScripts = databaseHelper.GetPreviouslyAppliedScripts(database);
+            var previouslyAppliedScripts = databaseHelper.GetPreviouslyAppliedScripts(server);
             var appliedScriptsLookup = previouslyAppliedScripts.ToDictionary(x => x.Filename, x => x.Hash);
 
             return scriptFiles.Where(x => !appliedScriptsLookup.ContainsKey(x.Name)).OrderBy(x => x.Name).ToList();
         }
 
-        private static bool ApplyScripts(IEnumerable<FileInfo> scriptsToApply, Server server, Database database, DatabaseHelper databaseHelper, FileSystemHelper fileSystemHelper, bool recordOnly, GusTaskExecutionContext context, bool haltOnError)
+        private static bool ApplyScripts(IEnumerable<FileInfo> scriptsToApply, Server server, DatabaseHelper databaseHelper, FileSystemHelper fileSystemHelper, bool recordOnly, GusTaskExecutionContext context, bool haltOnError)
         {
             uint index = 0;
             var hasErrors = false;
@@ -79,11 +80,11 @@
                     {
                         using (var sr = script.OpenText())
                         {
-                            database.ExecuteNonQuery(sr.ReadToEnd());
+                            server.ConnectionContext.ExecuteNonQuery(sr.ReadToEnd());
                         }
                     }
 
-                    databaseHelper.RecordScript(database, script.Name, hash);
+                    databaseHelper.RecordScript(server, script.Name, hash);
 
                     server.ConnectionContext.CommitTransaction();
 

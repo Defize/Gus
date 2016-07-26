@@ -14,7 +14,8 @@
             var databaseHelper = new DatabaseHelper(context);
             var fileSystemHelper = new FileSystemHelper(context);
 
-            var connection = databaseHelper.CreateAndOpenConnection(configuration.Server);
+            var connection = databaseHelper.CreateAndOpenConnection(configuration.Server, configuration.Database, configuration.UserName, configuration.Password, false);
+
             if (connection == null)
             {
                 return false;
@@ -30,7 +31,7 @@
             }
 
             context.RaiseExecutionEvent("Determining scripts not yet applied.");
-            var scriptsToApply = GetScriptsToApply(configuration.SourcePath, database, databaseHelper, fileSystemHelper);
+            var scriptsToApply = GetScriptsToApply(configuration.SourcePath, server, databaseHelper, fileSystemHelper);
             if (scriptsToApply == null)
             {
                 return false;
@@ -47,7 +48,7 @@
             return true;
         }
 
-        private static ICollection<FileInfo> GetScriptsToApply(string sourcePath, Database database, DatabaseHelper databaseHelper, FileSystemHelper fileSystemHelper)
+        private static ICollection<FileInfo> GetScriptsToApply(string sourcePath, Server server, DatabaseHelper databaseHelper, FileSystemHelper fileSystemHelper)
         {
             var scriptFiles = fileSystemHelper.GetScriptFiles(sourcePath);
             if (scriptFiles == null)
@@ -55,7 +56,7 @@
                 return null;
             }
 
-            var previouslyAppliedScripts = databaseHelper.GetPreviouslyAppliedScripts(database);
+            var previouslyAppliedScripts = databaseHelper.GetPreviouslyAppliedScripts(server);
             var appliedScriptsLookup = previouslyAppliedScripts.ToDictionary(x => x.Filename, x => x.Hash);
 
             return scriptFiles.Where(x => !appliedScriptsLookup.ContainsKey(x.Name)).OrderBy(x => x.Name).ToList();

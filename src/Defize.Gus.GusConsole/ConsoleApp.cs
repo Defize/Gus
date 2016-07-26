@@ -23,7 +23,11 @@
             [Parameter(Aliases = "ro", Description = "Register scripts without executing.", Default = false)]
             bool recordOnly,
             [Parameter(Aliases = "hoe", Description = "Stop processing scripts when there is an error", Default = true)]
-            bool haltOnError)
+            bool haltOnError,
+            [Parameter(Aliases = "usr", Description = "Username for the server.", Required = false)]
+            string username,
+            [Parameter(Aliases = "pw", Description = "Password.", Required = false)]
+            string password)
         {
             var configuration = new ApplyTaskConfiguration
                                     {
@@ -33,7 +37,9 @@
                                         CreateManagementSchemaIfMissing = createManagementSchemaIfMissing,
                                         RecordOnly = recordOnly,
                                         SourcePath = source,
-                                        HaltOnError = haltOnError
+                                        HaltOnError = haltOnError,
+                                        UserName = username,
+                                        Password = password
                                     };
 
             var context = new GusTaskExecutionContext();
@@ -67,13 +73,19 @@
             [Parameter(Aliases = "svr", Description = "The destination server.", Required = true)]
             string server,
             [Parameter(Aliases = "db", Description = "The name of the database.", Required = true)]
-            string database)
+            string database,
+            [Parameter(Aliases = "usr", Description = "Username for the server.", Required = false)]
+            string username,
+            [Parameter(Aliases = "pw", Description = "Password.", Required = false)]
+            string password)
         {
             var configuration = new StatusTaskConfiguration
             {
                 Server = server,
                 Database = database,
-                SourcePath = source
+                SourcePath = source,
+                UserName = username,
+                Password = password
             };
 
             var context = new GusTaskExecutionContext();
