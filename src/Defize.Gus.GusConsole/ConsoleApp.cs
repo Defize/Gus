@@ -8,22 +8,25 @@
     {
         [Verb(Aliases = "a", Description = "Apply the specifed SQL scripts to the specified database.")]
         public static void Apply(
-            [Parameter(Aliases = "src", Description = "The source folder.")]
+            [Aliases("src")] [Description("The source folder.")]
             [DirectoryExists]
             string source,
-            [Parameter(Aliases = "svr", Description = "The destination server.", Required = true)]
+            [Aliases("svr")] [Description("The destination server.")] [Required]
             string server,
-            [Parameter(Aliases = "db", Description = "The name of the database.", Required = true)]
+            [Aliases("db")] [Description("The name of the database.")] [Required]
             string database,
-            [Parameter(Aliases = "cd", Description = "Creates the database if missing.", Default = false)]
+            [Aliases("cd")] [Description("Creates the database if missing.")] [DefaultValue(false)]
             bool createDatabaseIfMissing,
-
-            [Parameter(Aliases = "cms", Description = "Creates the Gus schema if missing.", Default = true)]
+            [Aliases("cms")] [Description("Creates the Gus schema if missing.")] [DefaultValue(true)]
             bool createManagementSchemaIfMissing,
-            [Parameter(Aliases = "ro", Description = "Register scripts without executing.", Default = false)]
+            [Aliases("ro")] [Description("Register scripts without executing.")] [DefaultValue(false)]
             bool recordOnly,
-            [Parameter(Aliases = "hoe", Description = "Stop processing scripts when there is an error", Default = true)]
-            bool haltOnError)
+            [Aliases("hoe")] [Description("Stop processing scripts when there is an error")] [DefaultValue(true)]
+            bool haltOnError,
+            [Aliases("usr")] [Description("Username for the server.")] 
+            string username,
+            [Aliases("pw")] [Description("Password.")] 
+            string password)
         {
             var configuration = new ApplyTaskConfiguration
                                     {
@@ -33,7 +36,9 @@
                                         CreateManagementSchemaIfMissing = createManagementSchemaIfMissing,
                                         RecordOnly = recordOnly,
                                         SourcePath = source,
-                                        HaltOnError = haltOnError
+                                        HaltOnError = haltOnError,
+                                        UserName = username,
+                                        Password = password
                                     };
 
             var context = new GusTaskExecutionContext();
@@ -61,19 +66,24 @@
 
         [Verb(Aliases = "s", Description = "List the SQL scripts not yet applied to the specified database.")]
         public static void Status(
-            [Parameter(Aliases = "src", Description = "The source folder.")]
-            [DirectoryExists]
+            [Aliases("src")] [Description("The source folder.")] [DirectoryExists]
             string source,
-            [Parameter(Aliases = "svr", Description = "The destination server.", Required = true)]
+            [Aliases("svr")] [Description("The destination server.")][Required]
             string server,
-            [Parameter(Aliases = "db", Description = "The name of the database.", Required = true)]
-            string database)
+            [Aliases("db")] [Description("The name of the database.")][Required]
+            string database,
+            [Aliases("usr")] [Description("Username for the server.")]
+            string username,
+            [Aliases("pw")] [Description("Password.")]
+            string password)
         {
             var configuration = new StatusTaskConfiguration
             {
                 Server = server,
                 Database = database,
-                SourcePath = source
+                SourcePath = source,
+                UserName = username,
+                Password = password
             };
 
             var context = new GusTaskExecutionContext();
@@ -101,7 +111,7 @@
 
         [Verb(Aliases = "c", Description = "Create a new SQL script with a unique timestamped name.")]
         public static void Create(
-            [Parameter(Aliases = "n", Description = "The name of the script to create.", Required = true)]
+            [Aliases("n")][Description("The name of the script to create.")][Required]
             string name)
         {
             var configuration = new CreateTaskConfiguration
@@ -146,11 +156,11 @@
         }
 
         [Error]
-        public static void Error(Exception ex)
+        public static void Error(ExceptionContext ex)
         {
             Console.WriteLine("The horrors.");
-            Console.WriteLine(ex.Message);
-            Console.WriteLine(ex.StackTrace);
+            Console.WriteLine(ex.Exception.Message);
+            Console.WriteLine(ex.Exception.StackTrace);
         }
 
         private static void TaskExecutionEventHandler(object sender, GusTaskExecutionEventArgs e)

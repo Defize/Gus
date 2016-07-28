@@ -10,12 +10,12 @@
     {
         private const string SchemaName = "Gus";
         private const string HistoryTableName = "GusHistory";
-        private const string HistoryTablePrimaryKeyName = "PK_Gus_GusHistory";
+        private string HistoryTablePrimaryKeyName = $"PK_{SchemaName}_{HistoryTableName}";
         private const string HistoryTableFilenameColumnName = "Filename";
         private const string HistoryTableHashColumnName = "Hash";
         private const string HistoryTableAppliedOnColumnName = "AppliedOn";
         private const string HistoryTableAppliedByColumnName = "AppliedBy";
-        private const string RegisterSqlScript = "INSERT INTO [Gus].[GusHistory] ([Filename], [Hash], [AppliedOn], [AppliedBy]) VALUES (N'{0}', N'{1}', GETDATE(), SYSTEM_USER)";
+        private string RegisterSqlScript = "INSERT INTO [{0}].[{1}] ([Filename], [Hash], [AppliedOn], [AppliedBy]) VALUES (N'{2}', N'{3}', GETDATE(), SYSTEM_USER)";        
 
         private readonly GusTaskExecutionContext _context;
 
@@ -24,17 +24,37 @@
             _context = context;
         }
 
-        public SqlConnection CreateAndOpenConnection(string server)
+        public SqlConnection CreateAndOpenConnection(string server, string database, string username, string password, bool createDatabaseIfMissing)
         {
             _context.RaiseExecutionEvent(string.Format("Connecting to database '{0}'.", server));
 
             var connectionBuilder = new SqlConnectionStringBuilder { DataSource = server, IntegratedSecurity = true };
+
+            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+            {
+                connectionBuilder.IntegratedSecurity = false;
+                connectionBuilder.UserID = username;
+                connectionBuilder.Password = password;
+                connectionBuilder.Encrypt = true;
+            }
+
+            if (!createDatabaseIfMissing)
+            {
+                connectionBuilder.InitialCatalog = database;
+            }
+
             var connectionString = connectionBuilder.ToString();
 
             var connection = new SqlConnection(connectionString);
 
+            return Connect(connection);
+        }
+
+        private SqlConnection Connect(SqlConnection connection)
+        {
             try
             {
+
                 connection.Open();
             }
             catch (SqlException ex)
@@ -56,13 +76,13 @@
                 return null;
             }
 
-            var isSchemaValid = CheckSchema(database, createManagementSchemaIfMissing);
+            var isSchemaValid = CheckSchema(server, createManagementSchemaIfMissing);
             if (!isSchemaValid)
             {
                 return null;
             }
 
-            var isHistoryTableValid = CheckHistoryTable(database, createManagementSchemaIfMissing);
+            var isHistoryTableValid = CheckHistoryTable(server, databaseName, createManagementSchemaIfMissing);
             if (!isHistoryTableValid)
             {
                 return null;
@@ -71,9 +91,9 @@
             return database;
         }
 
-        public ICollection<AppliedScript> GetPreviouslyAppliedScripts(Database database)
+        public ICollection<AppliedScript> GetPreviouslyAppliedScripts(Server server)
         {
-            var results = database.ExecuteWithResults("SELECT [Filename], [Hash] FROM [Gus].[GusHistory]");
+            var results = server.ConnectionContext.ExecuteWithResults($"SELECT [Filename], [Hash] FROM [{SchemaName}].[{HistoryTableName}]");
             var table = results.Tables[0];
             var rows = table.Rows;
 
@@ -84,16 +104,19 @@
                                                            }).ToList();
         }
 
-        public void RecordScript(Database database, string filename, string hash)
+        public void RecordScript(Server server, string filename, string hash)
         {
             filename = filename.Replace("'", "''");
-            var sql = string.Format(RegisterSqlScript, filename, hash);
-            database.ExecuteNonQuery(sql);
+            var sql = string.Format(RegisterSqlScript, SchemaName, HistoryTableName, filename, hash);
+            server.ConnectionContext.ExecuteNonQuery(sql);
         }
 
         private Database OpenDatabase(Server server, string databaseName, bool createDatabaseIfMissing)
         {
+            var databases = server.Databases.Cast<Database>().ToList();
+
             var database = server.Databases[databaseName];
+
             if (database == null)
             {
                 if (createDatabaseIfMissing)
@@ -111,15 +134,18 @@
             return database;
         }
 
-        private bool CheckSchema(Database database, bool createManagementSchemaIfMissing)
+        private bool CheckSchema(Server server, bool createManagementSchemaIfMissing)
         {
-            var schema = database.Schemas[SchemaName];
+
+            var schemas = server.ConnectionContext.ExecuteWithResults("SELECT name FROM sys.schemas").Tables[0].Rows.Cast<DataRow>();
+
+            var schema = schemas.FirstOrDefault(x => x.ItemArray[0].ToString() == SchemaName);
+
             if (schema == null)
             {
                 if (createManagementSchemaIfMissing)
                 {
-                    schema = new Schema(database, SchemaName);
-                    schema.Create();
+                    server.ConnectionContext.ExecuteNonQuery($"CREATE SCHEMA [{SchemaName}]");
                 }
                 else
                 {
@@ -131,35 +157,28 @@
             return true;
         }
 
-        private bool CheckHistoryTable(Database database, bool createManagementSchemaIfMissing)
+        private bool CheckHistoryTable(Server server, string databaseName, bool createManagementSchemaIfMissing)
         {
-            var historyTable = database.Tables[HistoryTableName, SchemaName];
-            if (historyTable == null)
+            var results = server.ConnectionContext.ExecuteWithResults($@"SELECT * FROM INFORMATION_SCHEMA.TABLES 
+                                                                       WHERE TABLE_TYPE = 'BASE TABLE' 
+                                                                       AND TABLE_CATALOG = '{databaseName}' 
+                                                                       AND TABLE_SCHEMA = '{SchemaName}' 
+                                                                       AND TABLE_NAME = '{HistoryTableName}'").Tables[0].Rows.Cast<DataRow>();
+
+            if (!results.Any())
             {
                 if (createManagementSchemaIfMissing)
                 {
-                    historyTable = new Table(database, HistoryTableName, SchemaName);
-
-                    var filenameColumn = new Column(historyTable, HistoryTableFilenameColumnName) { DataType = DataType.NVarChar(256), Nullable = false };
-                    historyTable.Columns.Add(filenameColumn);
-
-                    var hashColumn = new Column(historyTable, HistoryTableHashColumnName) { DataType = DataType.NVarChar(128), Nullable = false };
-                    historyTable.Columns.Add(hashColumn);
-
-                    var appliedOnColumn = new Column(historyTable, HistoryTableAppliedOnColumnName) { DataType = DataType.DateTime, Nullable = false };
-                    historyTable.Columns.Add(appliedOnColumn);
-
-                    var appliedByColumn = new Column(historyTable, HistoryTableAppliedByColumnName) { DataType = DataType.NVarChar(256), Nullable = false };
-                    historyTable.Columns.Add(appliedByColumn);
-
-                    historyTable.Create();
-
-                    var primaryKey = new Index(historyTable, HistoryTablePrimaryKeyName);
-                    primaryKey.IndexedColumns.Add(new IndexedColumn(primaryKey, filenameColumn.Name));
-                    primaryKey.IsUnique = true;
-                    primaryKey.IndexKeyType = IndexKeyType.DriPrimaryKey;
-
-                    primaryKey.Create();
+                    server.ConnectionContext.ExecuteNonQuery($@"CREATE TABLE [{SchemaName}].[{HistoryTableName}](
+                                                                [Filename][nvarchar](256) NOT NULL,
+                                                                [Hash][nvarchar](128) NOT NULL,
+                                                                [AppliedOn][datetime] NOT NULL,
+                                                                [AppliedBy][nvarchar](256) NOT NULL,
+                                                                 CONSTRAINT [{HistoryTablePrimaryKeyName}] PRIMARY KEY CLUSTERED 
+                                                                (
+	                                                                [Filename] ASC
+                                                                )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+                                                                ) ON [PRIMARY]");
                 }
                 else
                 {
