@@ -156,11 +156,11 @@
         }
 
         [Error]
-        public static void Error(Exception ex)
+        public static void Error(ExceptionContext ex)
         {
             Console.WriteLine("The horrors.");
-            Console.WriteLine(ex.Message);
-            Console.WriteLine(ex.StackTrace);
+            Console.WriteLine(ex.Exception.Message);
+            Console.WriteLine(ex.Exception.StackTrace);
         }
 
         private static void TaskExecutionEventHandler(object sender, GusTaskExecutionEventArgs e)
