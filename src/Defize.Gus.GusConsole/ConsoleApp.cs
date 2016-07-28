@@ -8,25 +8,24 @@
     {
         [Verb(Aliases = "a", Description = "Apply the specifed SQL scripts to the specified database.")]
         public static void Apply(
-            [Parameter(Aliases = "src", Description = "The source folder.")]
+            [Aliases("src")] [Description("The source folder.")]
             [DirectoryExists]
             string source,
-            [Parameter(Aliases = "svr", Description = "The destination server.", Required = true)]
+            [Aliases("svr")] [Description("The destination server.")] [Required]
             string server,
-            [Parameter(Aliases = "db", Description = "The name of the database.", Required = true)]
+            [Aliases("db")] [Description("The name of the database.")] [Required]
             string database,
-            [Parameter(Aliases = "cd", Description = "Creates the database if missing.", Default = false)]
+            [Aliases("cd")] [Description("Creates the database if missing.")] [DefaultValue(false)]
             bool createDatabaseIfMissing,
-
-            [Parameter(Aliases = "cms", Description = "Creates the Gus schema if missing.", Default = true)]
+            [Aliases("cms")] [Description("Creates the Gus schema if missing.")] [DefaultValue(true)]
             bool createManagementSchemaIfMissing,
-            [Parameter(Aliases = "ro", Description = "Register scripts without executing.", Default = false)]
+            [Aliases("ro")] [Description("Register scripts without executing.")] [DefaultValue(false)]
             bool recordOnly,
-            [Parameter(Aliases = "hoe", Description = "Stop processing scripts when there is an error", Default = true)]
+            [Aliases("hoe")] [Description("Stop processing scripts when there is an error")] [DefaultValue(true)]
             bool haltOnError,
-            [Parameter(Aliases = "usr", Description = "Username for the server.", Required = false)]
+            [Aliases("usr")] [Description("Username for the server.")] 
             string username,
-            [Parameter(Aliases = "pw", Description = "Password.", Required = false)]
+            [Aliases("pw")] [Description("Password.")] 
             string password)
         {
             var configuration = new ApplyTaskConfiguration
@@ -67,16 +66,15 @@
 
         [Verb(Aliases = "s", Description = "List the SQL scripts not yet applied to the specified database.")]
         public static void Status(
-            [Parameter(Aliases = "src", Description = "The source folder.")]
-            [DirectoryExists]
+            [Aliases("src")] [Description("The source folder.")] [DirectoryExists]
             string source,
-            [Parameter(Aliases = "svr", Description = "The destination server.", Required = true)]
+            [Aliases("svr")] [Description("The destination server.")][Required]
             string server,
-            [Parameter(Aliases = "db", Description = "The name of the database.", Required = true)]
+            [Aliases("db")] [Description("The name of the database.")][Required]
             string database,
-            [Parameter(Aliases = "usr", Description = "Username for the server.", Required = false)]
+            [Aliases("usr")] [Description("Username for the server.")]
             string username,
-            [Parameter(Aliases = "pw", Description = "Password.", Required = false)]
+            [Aliases("pw")] [Description("Password.")]
             string password)
         {
             var configuration = new StatusTaskConfiguration
@@ -113,7 +111,7 @@
 
         [Verb(Aliases = "c", Description = "Create a new SQL script with a unique timestamped name.")]
         public static void Create(
-            [Parameter(Aliases = "n", Description = "The name of the script to create.", Required = true)]
+            [Aliases("n")][Description("The name of the script to create.")][Required]
             string name)
         {
             var configuration = new CreateTaskConfiguration
